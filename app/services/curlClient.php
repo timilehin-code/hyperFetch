@@ -5,69 +5,33 @@ namespace App\Services;
 class CurlClient
 {
 
-    public function get(string $url, array $headers = [])
+    private function request(string $method, string $url, array $data = [], array $headers = []): array
     {
-
         $cUrlInit = curl_init($url);
 
-        curl_setopt_array($cUrlInit, [
+        $options = [
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER => $headers,
-            CURLOPT_TIMEOUT => 30,
+            CURLOPT_CUSTOMREQUEST  => strtoupper($method),
+            CURLOPT_TIMEOUT        => 30,
             CURLOPT_FOLLOWLOCATION => true,
-        ]);
-
-
-        $response =  curl_exec($cUrlInit);
-
-
-        // 4. Capture metadata & handle errors
-        $statusCode = curl_getinfo($cUrlInit, CURLINFO_HTTP_CODE);
-        $totalTime  = curl_getinfo($cUrlInit, CURLINFO_TOTAL_TIME);
-        $size = curl_getinfo($cUrlInit, CURLINFO_SIZE_DOWNLOAD);
-        $contentType = curl_getinfo($cUrlInit, CURLINFO_CONTENT_TYPE);
-        $error      = curl_error($cUrlInit);
-
-
-
-        $result =  [
-            'statusCode'    => $statusCode,
-            'body'          => $response,
-            'executionTime' => $totalTime,
-            'size' => $size,
-            'contentType' => $contentType,
-            'error'         => $error ?: null,
         ];
 
-        return $result;
-    }
+        if (!empty($data)) {
+            $options[CURLOPT_POSTFIELDS] = json_encode($data);
+            $headers[] = 'Content-Type: application/json';
+        }
 
+        $options[CURLOPT_HTTPHEADER] = $headers;
 
-    public function Post(string $cUrlInit, array $data, $headers = [])
-    {
-        $encodedData =   json_encode($data);
+        curl_setopt_array($cUrlInit, $options);
 
-        $headers[] = 'content-type: application/json';
-
-        $cUrlInit = curl_init($cUrlInit);
-
-        curl_setopt_array($cUrlInit, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => $encodedData,
-            CURLOPT_HTTPHEADER => $headers,
-            CURLOPT_TIMEOUT => 30,
-            CURLOPT_FOLLOWLOCATION => true,
-        ]);
-        $response = curl_exec($cUrlInit);
-
+        $response    = curl_exec($cUrlInit);
         $statusCode  = curl_getinfo($cUrlInit, CURLINFO_HTTP_CODE);
         $totalTime   = curl_getinfo($cUrlInit, CURLINFO_TOTAL_TIME);
         $size        = curl_getinfo($cUrlInit, CURLINFO_SIZE_DOWNLOAD);
         $contentType = curl_getinfo($cUrlInit, CURLINFO_CONTENT_TYPE);
         $error       = curl_error($cUrlInit);
 
-        // 7. Return standard result payload
         return [
             'statusCode'    => $statusCode,
             'body'          => $response,
@@ -78,5 +42,25 @@ class CurlClient
         ];
     }
 
-    
+    public function get(string $url, array $headers = [])
+    {
+
+        return $this->request("GET", $url, $headers);
+    }
+
+
+    public function post(string $url, array $data = [], array $headers = []): array
+    {
+        return $this->request("POST", $url, $data, $headers);
+    }
+
+    public function put(string $url, array $data = [], $headers = [])
+    {
+        return $this->request("PUT", $url, $data, $headers);
+    }
+
+    public function Delete(string $url,  $headers = [])
+    {
+        return $this->request("DELETE", $url, $headers);
+    }
 }

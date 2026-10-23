@@ -6,18 +6,21 @@ use App\Services\CurlClient;
 
 class HomeController
 {
-
-    public function index()
+    public function index(): void
     {
+        $client = new CurlClient();
 
-        $Client = new CurlClient();
-        $response = $Client->get("https://httpbin.org/get");
+        $response = $client->post('https://httpbin.org/post', [
+            'name' => 'Timilehin',
+            'app'  => 'HyperFetch'
+        ]);
+
         $data = [
-            'Title' => "Home page",
-            'status' => "Engine is ready"
+            'pageTitle' => 'HyperFetch POST Test Dashboard',
+            'response'  => $response
         ];
-        extract($data);
 
+        extract($data);
         require_once dirname(__DIR__) . '/Views/home.php';
     }
 }
