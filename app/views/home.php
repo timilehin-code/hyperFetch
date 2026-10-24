@@ -27,6 +27,7 @@
             border-radius: 6px;
             color: #38bdf8;
             overflow-x: auto;
+            font-size: 0.9rem;
         }
 
         ul {
@@ -42,11 +43,20 @@
             color: #94a3b8;
         }
 
-        .success {
+        .badge {
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.85rem;
+        }
+
+        .badge-success {
+            background: #166534;
             color: #4ade80;
         }
 
-        .error {
+        .badge-error {
+            background: #991b1b;
             color: #f87171;
         }
     </style>
@@ -56,19 +66,32 @@
     <h1><?= htmlspecialchars($pageTitle) ?></h1>
 
     <div class="card">
-        <h2>Request Metadata</h2>
+        <h2>Request Telemetry</h2>
         <ul>
-            <li><strong>Status Code:</strong> <span class="success"><?= htmlspecialchars($response['statusCode']) ?></span></li>
-            <li><strong>Execution Time:</strong> <?= htmlspecialchars(number_format($response['executionTime'], 4)) ?> seconds</li>
-            <li><strong>Content Type:</strong> <?= htmlspecialchars($response['contentType'] ?? 'N/A') ?></li>
-            <li><strong>Download Size:</strong> <?= htmlspecialchars($response['size']) ?> bytes</li>
-            <li><strong>Error:</strong> <span class="<?= $response['error'] ? 'error' : 'success' ?>"><?= htmlspecialchars($response['error'] ?? 'None') ?></span></li>
+            <li>
+                <strong>Status Code:</strong>
+                <span class="badge <?= $response->isSuccess() ? 'badge-success' : 'badge-error' ?>">
+                    <?= htmlspecialchars($response->getStatusCode()) ?>
+                </span>
+            </li>
+            <li><strong>Execution Time:</strong> <?= htmlspecialchars(number_format($response->getExecutionTime(), 4)) ?> seconds</li>
+            <li><strong>Format Detected:</strong> <?= $response->isJson() ? 'Parsed JSON Array' : 'Raw String / Text' ?></li>
+            <li>
+                <strong>Errors:</strong>
+                <span class="<?= $response->getError() ? 'badge-error' : 'badge-success' ?>">
+                    <?= htmlspecialchars($response->getError() ?? 'None') ?>
+                </span>
+            </li>
         </ul>
     </div>
 
     <div class="card">
-        <h2>Raw Payload Output</h2>
-        <pre><?= htmlspecialchars($response['body']) ?></pre>
+        <h2>Parsed Data Output</h2>
+        <?php if ($response->isJson()): ?>
+            <pre><?= htmlspecialchars(json_encode($response->json(), JSON_PRETTY_PRINT)) ?></pre>
+        <?php else: ?>
+            <pre><?= htmlspecialchars($response->getBody()) ?></pre>
+        <?php endif; ?>
     </div>
 </body>
 

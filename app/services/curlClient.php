@@ -4,25 +4,59 @@ namespace App\Services;
 
 class CurlClient
 {
-    private function request(string $method, string $url, array $data = [], array $headers = []): Response
+
+
+
+    /**
+     * Converts key-value arrays into cURL header strings.
+     * e.g. ['Accept' => 'application/json'] -> ['Accept: application/json']
+     */
+    private function formatHeaders(array $headers): array
     {
+        $formatted = [];
+
+        foreach ($headers as $key => $value) {
+            if (is_string($key)) {
+                $formatted[] = "{$key}: {$value}";
+            } else {
+                $formatted[] = $value; // Keeps indexed strings intact
+            }
+        }
+
+        return $formatted;
+    }
+
+    private function request(
+        string $method,
+        string $url,
+        array $data = [],
+        array $headers = [],
+        array $customOptions = []
+    ): Response {
         $cUrlInit = curl_init($url);
 
-        $options = [
+        // Standard defaults
+        $defaultOptions = [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_CUSTOMREQUEST  => strtoupper($method),
             CURLOPT_TIMEOUT        => 30,
             CURLOPT_FOLLOWLOCATION => true,
         ];
 
+        // Format headers into valid "Key: Value" strings
+        $formattedHeaders = $this->formatHeaders($headers);
+
         if (!empty($data)) {
-            $options[CURLOPT_POSTFIELDS] = json_encode($data);
-            $headers[] = 'Content-Type: application/json';
+            $defaultOptions[CURLOPT_POSTFIELDS] = json_encode($data);
+            $formattedHeaders[] = 'Content-Type: application/json';
         }
 
-        $options[CURLOPT_HTTPHEADER] = $headers;
+        $defaultOptions[CURLOPT_HTTPHEADER] = $formattedHeaders;
 
-        curl_setopt_array($cUrlInit, $options);
+        // Custom options override defaults if keys collide
+        $finalOptions = $customOptions + $defaultOptions;
+
+        curl_setopt_array($cUrlInit, $finalOptions);
 
         $response    = curl_exec($cUrlInit);
         $statusCode  = curl_getinfo($cUrlInit, CURLINFO_HTTP_CODE);
@@ -43,23 +77,29 @@ class CurlClient
         return new Response($result);
     }
 
-    public function get(string $url, array $headers = []): Response
+    public function get(string $url, array $query = [], array $headers = [], array $options = []): Response
     {
-        return $this->request("GET", $url, [], $headers);
+        if (!empty($query)) {
+            $queryString = http_build_query($query);
+            $separator   = str_contains($url, '?') ? '&' : '?';
+            $url        .= $separator . $queryString;
+        }
+
+        return $this->request('GET', $url, [], $headers, $options);
     }
 
-    public function post(string $url, array $data = [], array $headers = []): Response
+    public function post(string $url, array $data = [], array $headers = [], array $options = []): Response
     {
-        return $this->request("POST", $url, $data, $headers);
+        return $this->request('POST', $url, $data, $headers, $options);
     }
 
-    public function put(string $url, array $data = [], array $headers = []): Response
+    public function put(string $url, array $data = [], array $headers = [], array $options = []): Response
     {
-        return $this->request("PUT", $url, $data, $headers);
+        return $this->request('PUT', $url, $data, $headers, $options);
     }
 
-    public function delete(string $url, array $headers = []): Response
+    public function delete(string $url, array $headers = [], array $options = []): Response
     {
-        return $this->request("DELETE", $url, [], $headers);
+        return $this->request('DELETE', $url, [], $headers, $options);
     }
 }
