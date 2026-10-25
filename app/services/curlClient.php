@@ -12,7 +12,7 @@ class CurlClient
     private bool $throwOnHttpError = false;
 
     private int $maxRetries = 0;
-    private int $retryDelayMs = 200;
+    private int $retryDelayMs = 100;
 
     /**
      * Configure automatic retries for transient network/server failures.
