@@ -2,30 +2,20 @@
 
 namespace App\Services;
 
-use App\Exceptions\NetworkExceptions;
+use App\Exceptions\NetworkException;
+use App\Exceptions\HttpException;
 use App\Exceptions\HttpExceptions;
+use App\Exceptions\NetworkExceptions;
 
 class CurlClient
 {
-
     private array $defaultHeaders = [];
+    private array $pendingQuery = [];
     private bool $throwOnHttpError = false;
-
     private int $maxRetries = 0;
     private int $retryDelayMs = 100;
+    private int $timeoutSeconds = 30;
 
-    /**
-     * Configure automatic retries for transient network/server failures.
-     *
-     * @param int $times Number of retry attempts (excluding the initial request)
-     * @param int $delayMs Pause duration in milliseconds between attempts
-     */
-    public function retry(int $times = 3, int $delayMs = 100): self
-    {
-        $this->maxRetries = max(0, $times);
-        $this->retryDelayMs = max(0, $delayMs);
-        return $this;
-    }
     /**
      * Set a Bearer or custom token authorization header.
      */
@@ -55,6 +45,52 @@ class CurlClient
     }
 
     /**
+     * Set multiple headers at once.
+     */
+    public function withHeaders(array $headers): self
+    {
+        $this->defaultHeaders = array_merge($this->defaultHeaders, $headers);
+        return $this;
+    }
+
+    /**
+     * Set default Accept header to JSON.
+     */
+    public function acceptJson(): self
+    {
+        $this->defaultHeaders['Accept'] = 'application/json';
+        return $this;
+    }
+
+    /**
+     * Set query parameters fluently.
+     */
+    public function withQuery(array $query): self
+    {
+        $this->pendingQuery = array_merge($this->pendingQuery, $query);
+        return $this;
+    }
+
+    /**
+     * Set custom request timeout in seconds.
+     */
+    public function timeout(int $seconds): self
+    {
+        $this->timeoutSeconds = max(1, $seconds);
+        return $this;
+    }
+
+    /**
+     * Configure automatic retries for transient failures.
+     */
+    public function retry(int $times = 3, int $delayMs = 100): self
+    {
+        $this->maxRetries = max(0, $times);
+        $this->retryDelayMs = max(0, $delayMs);
+        return $this;
+    }
+
+    /**
      * Enable automatic throwing of HttpException on 4xx/5xx responses.
      */
     public function throw(): self
@@ -63,22 +99,16 @@ class CurlClient
         return $this;
     }
 
-    /**
-     * Converts key-value arrays into cURL header strings.
-     * e.g. ['Accept' => 'application/json'] -> ['Accept: application/json']
-     */
     private function formatHeaders(array $headers): array
     {
         $formatted = [];
-
         foreach ($headers as $key => $value) {
             if (is_string($key)) {
                 $formatted[] = "{$key}: {$value}";
             } else {
-                $formatted[] = $value; // Keeps indexed strings intact
+                $formatted[] = $value;
             }
         }
-
         return $formatted;
     }
 
@@ -99,7 +129,7 @@ class CurlClient
             $defaultOptions = [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_CUSTOMREQUEST  => strtoupper($method),
-                CURLOPT_TIMEOUT        => 30,
+                CURLOPT_TIMEOUT        => $this->timeoutSeconds,
                 CURLOPT_FOLLOWLOCATION => true,
             ];
 
@@ -124,7 +154,6 @@ class CurlClient
             $cUrlError   = curl_error($cUrlInit);
             $cUrlErrNo   = curl_errno($cUrlInit);
 
-            // 1. Handle cURL network-level failures
             if ($cUrlErrNo !== 0) {
                 if ($attempts < $totalAllowedAttempts) {
                     usleep($this->retryDelayMs * 1000);
@@ -142,7 +171,6 @@ class CurlClient
                 'error'         => $cUrlError ?: null,
             ]);
 
-            // 2. Check if HTTP status code warrants a retry (5xx server errors or 429 rate limit)
             $shouldRetryStatus = ($statusCode === 429 || ($statusCode >= 500 && $statusCode <= 599));
 
             if ($shouldRetryStatus && $attempts < $totalAllowedAttempts) {
@@ -150,22 +178,26 @@ class CurlClient
                 continue;
             }
 
-            // 3. Throw HttpException if configured and request ultimately failed
             if ($this->throwOnHttpError && $result->isFailed()) {
                 throw new HttpExceptions($result);
             }
 
+            // Reset pending state for subsequent requests on the same instance
+            $this->pendingQuery = [];
+
             return $result;
+
         } while ($attempts < $totalAllowedAttempts);
 
-        // Fallback return if loop terminates
         return $result;
     }
 
     public function get(string $url, array $query = [], array $headers = [], array $options = []): Response
     {
-        if (!empty($query)) {
-            $queryString = http_build_query($query);
+        $mergedQuery = array_merge($this->pendingQuery, $query);
+
+        if (!empty($mergedQuery)) {
+            $queryString = http_build_query($mergedQuery);
             $separator   = str_contains($url, '?') ? '&' : '?';
             $url        .= $separator . $queryString;
         }
