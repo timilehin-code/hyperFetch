@@ -3,28 +3,32 @@
 namespace App\Controllers;
 
 use App\Services\CurlClient;
+use App\Exceptions\NetworkExceptions;
+use App\Exceptions\HttpExceptions;
 
 class HomeController
 {
-    public function index(): void
+   public function index(): void
     {
         $client = new CurlClient();
-        $response = $client->get(
-            'https://httpbin.org/headers',
-            ['ref' => 'dashboard'],                           
-            [                                                 
-                'Authorization' => 'Bearer secret_token_123',
-                'User-Agent'    => 'HyperFetch/1.0 Engine'
-            ],
-            [                                                
-                CURLOPT_TIMEOUT => 15                         
-            ]
-        );
-        $data = [
-            'pageTitle'  => 'HyperFetch JSON Test Dashboard',
-            'response'   => $response,
-            'parsedData' => $response->isSuccess() ? $response->json() : null
-        ];
+
+        try {
+            // Attempt request up to 3 times with a 200ms pause between tries
+            $response = $client->retry(3, 200)
+                               ->get('https://httpbin.org/status/200');
+
+            $data = [
+                'pageTitle' => 'Retry Test Result',
+                'response'  => $response
+            ];
+
+        } catch (HttpExceptions $e) {
+            echo "Failed after all retries. Status: " . $e->getResponse()->getStatusCode();
+            return;
+        } catch (NetworkExceptions $e) {
+            echo "Network issue after all retries: " . $e->getMessage();
+            return;
+        }
 
         extract($data);
         require_once dirname(__DIR__) . '/Views/home.php';
