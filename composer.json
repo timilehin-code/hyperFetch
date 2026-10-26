@@ -1,7 +1,8 @@
 {
     "Name": "Oluwatimilhin/HyperFetch",
     "require": {
-        "bramus/router": "^1.6"
+        "bramus/router": "^1.6",
+        "psr/log": "^3.0"
     },
     "autoload": {
         "psr-4": {
