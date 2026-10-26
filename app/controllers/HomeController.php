@@ -3,35 +3,26 @@
 namespace App\Controllers;
 
 use App\Services\CurlClient;
-use App\Exceptions\NetworkExceptions;
-use App\Exceptions\HttpExceptions;
+use App\Services\SimpleFileLogger;
 
 class HomeController
 {
     public function index(): void
     {
-        $client = new CurlClient();
+        $logger = new SimpleFileLogger();
+        
+        // Pass logger instance via constructor or withLogger()
+        $client = (new CurlClient($logger))
+            ->withToken('sk_live_12345')
+            ->timeout(10);
 
-        try {
-            // Attempt request up to 3 times with a 200ms pause between tries
-            $response = $client->withToken('sk_live_998877')
-                ->acceptJson()
-                ->timeout(10)
-                ->withQuery(['category' => 'tech', 'limit' => 5])
-                ->retry(2, 150)
-                ->get('https://httpbin.org/get');
+        // Execute GET request
+        $response = $client->get('https://httpbin.org/get');
 
-            $data = [
-                'pageTitle' => 'Retry Test Result',
-                'response'  => $response
-            ];
-        } catch (HttpExceptions $e) {
-            echo "Failed after all retries. Status: " . $e->getResponse()->getStatusCode();
-            return;
-        } catch (NetworkExceptions $e) {
-            echo "Network issue after all retries: " . $e->getMessage();
-            return;
-        }
+        $data = [
+            'pageTitle' => 'PSR-3 Logging Active',
+            'response'  => $response
+        ];
 
         extract($data);
         require_once dirname(__DIR__) . '/Views/home.php';

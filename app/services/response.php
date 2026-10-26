@@ -4,15 +4,13 @@ namespace App\Services;
 
 class Response
 {
-
-    public int $statusCode;
-    public string $body;
-    public float $executionTime;
-    public int $size;
-    public ?string $contentType;
+    private int $statusCode;
+    private string $body;
+    private float $executionTime;
+    private int $size;
+    private ?string $contentType;
     private ?string $error;
     private mixed $parsedJson = null;
-
 
     public function __construct(array $responseData)
     {
@@ -26,7 +24,10 @@ class Response
         $this->parseJson();
     }
 
-    private function parseJson()
+    /**
+     * Safely attempts to parse JSON body into a PHP array.
+     */
+    private function parseJson(): void
     {
         if (empty($this->body)) {
             return;
@@ -39,24 +40,24 @@ class Response
         }
     }
 
-    public function getStatusCode()
+    public function getStatusCode(): int
     {
         return $this->statusCode;
     }
 
-    public function getBody()
+    public function getBody(): string
     {
         return $this->body;
     }
 
-    public function json(mixed $default = null)
+    public function getSize(): int
     {
-        return $this->parsedJson ?? $default;
+        return $this->size;
     }
 
-    public function isJson(): bool
+    public function getContentType(): ?string
     {
-        return $this->parsedJson !== null;
+        return $this->contentType;
     }
 
     public function getExecutionTime(): float
@@ -67,6 +68,19 @@ class Response
     public function getError(): ?string
     {
         return $this->error;
+    }
+
+    /**
+     * Returns parsed JSON array or a fallback value if not valid JSON.
+     */
+    public function json(mixed $default = null): mixed
+    {
+        return $this->parsedJson ?? $default;
+    }
+
+    public function isJson(): bool
+    {
+        return $this->parsedJson !== null;
     }
 
     // Status Code Helpers
